@@ -1,18 +1,16 @@
 package com.example.authservice.controller;
 
 
-
 import com.example.authservice.exception.EmailAlreadyExistsException;
 import com.example.authservice.exception.UsernameAlreadyExistException;
 import com.example.authservice.jwt.JwtService;
+import com.example.authservice.model.enities.CustomUserDetail;
 import com.example.authservice.model.payload.ChangePasswordRequest;
 import com.example.authservice.model.payload.JwtResponse;
 import com.example.authservice.model.payload.LoginRequest;
 import com.example.authservice.model.payload.RegisterRequest;
 import com.example.authservice.service.AuthService;
-import com.example.authservice.service.EmailService;
-import lombok.RequiredArgsConstructor;
-
+import com.example.authservice.service.UserService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.ExampleObject;
@@ -22,27 +20,14 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.mail.MessagingException;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.AuthenticationManager;
-import org.springframework.security.authentication.BadCredentialsException;
-import org.springframework.security.authentication.DisabledException;
-import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.crypto.password.PasswordEncoder;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
-
-import java.time.LocalDateTime;
-import java.util.Collections;
 import org.springframework.web.bind.annotation.*;
-
-import java.time.LocalDateTime;
-import java.util.regex.Pattern;
 
 
 @RestController
@@ -56,7 +41,7 @@ public class AuthController {
     private final JwtService jwtService;
     private final AuthService authService;
     private final PasswordEncoder passwordEncoder;
-
+    private  final UserService userService;
 
 
     @PostMapping("/login")
@@ -158,4 +143,21 @@ public class AuthController {
         return ResponseEntity.ok("Password changed successfully");
     }
 
+    @PostMapping("/check_auth")
+    public ResponseEntity<Boolean> checkAuth(HttpServletRequest httpServletRequest){
+        String authHeader = httpServletRequest.getHeader("Authorization");
+        if (authHeader != null && authHeader.startsWith("Bearer ")) {
+            String token = authHeader.substring(7);
+            String email = jwtService.getEmailFromToken(token);
+            if (email != null && SecurityContextHolder.getContext().getAuthentication() == null) {
+                UserDetails user = userService.loadUserByEmail(email);
+                if (jwtService.validateToken(token, (CustomUserDetail) user)) {
+                    return ResponseEntity.ok(true);
+                }else{
+                    return ResponseEntity.ok(false);
+                }
+            }
+        }
+        return  ResponseEntity.ok(false);
+    }
 }
