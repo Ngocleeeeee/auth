@@ -53,8 +53,19 @@ public class AuthController {
             @ApiResponse(responseCode = "500", description = "Lỗi máy chủ.",
                     content = @Content(examples = @ExampleObject(value = "{ \"error\": \"Internal Server Error\" }")))
     })
-    public ResponseEntity<JwtResponse> login(@RequestBody LoginRequest jwtRequest) {
-        return ResponseEntity.ok(authService.login(jwtRequest));
+    public ResponseEntity<?> login(@RequestBody LoginRequest jwtRequest) {
+        try{
+            return ResponseEntity.ok(authService.login(jwtRequest));
+        }
+        catch (EmailAlreadyExistsException ex) {
+            return new ResponseEntity<>(ex.getMessage(), HttpStatus.NOT_ACCEPTABLE);
+        }
+        catch (RuntimeException runtimeException){
+            return new ResponseEntity<>(runtimeException.getMessage(),HttpStatus.BAD_REQUEST);
+        }
+        catch (Exception ex) {
+            return new ResponseEntity<>("An unexpected error occurred", HttpStatus.INTERNAL_SERVER_ERROR);
+        }
     }
 
     @PostMapping("/register")
@@ -69,11 +80,12 @@ public class AuthController {
     public ResponseEntity<?> register(@RequestBody RegisterRequest request){
         try {
             authService.register(request);
-        } catch (UsernameAlreadyExistException ex) {
+        } catch (UsernameAlreadyExistException | EmailAlreadyExistsException ex) {
             return new ResponseEntity<>(ex.getMessage(), HttpStatus.NOT_ACCEPTABLE);
-        } catch (EmailAlreadyExistsException ex) {
-            return new ResponseEntity<>(ex.getMessage(), HttpStatus.NOT_ACCEPTABLE);
-        } catch (Exception ex) {
+        } catch (RuntimeException runtimeException){
+            return new ResponseEntity<>(runtimeException.getMessage(),HttpStatus.BAD_REQUEST);
+        }
+        catch (Exception ex) {
             return new ResponseEntity<>("An unexpected error occurred", HttpStatus.INTERNAL_SERVER_ERROR);
         }
         return ResponseEntity.status(HttpStatus.CREATED).body("User registered successfully");

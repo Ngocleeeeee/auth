@@ -25,6 +25,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
+import java.util.concurrent.TimeoutException;
 import java.util.regex.Pattern;
 
 @Service
@@ -44,6 +45,15 @@ public class AuthService {
 
 
     public JwtResponse login(LoginRequest loginRequest){
+        if(loginRequest.getPassword().length()<6){
+            throw new RuntimeException("Password must be more than 6");
+        }
+        if (!isValidEmail(loginRequest.getEmail())) {
+            throw new EmailAlreadyExistsException("Invalid email format");
+        }
+        if(loginRequest.getPassword().isEmpty()||loginRequest.getEmail().isEmpty()){
+            throw new RuntimeException("Values that cannot be null");
+        }
         authenticateByEmail(loginRequest.getEmail(), loginRequest.getPassword());
         UserDetails userDetails=userService.loadUserByEmail(loginRequest.getEmail());
         String token = jwtService.generateToken((CustomUserDetail) userDetails);
@@ -57,11 +67,15 @@ public class AuthService {
         if (userService.existsByEmail(request.getEmail())) {
             throw new EmailAlreadyExistsException("Email already exist: "+request.getEmail());
         }
-
+        if(request.getPassword().length()<6){
+            throw new RuntimeException("Password must be more than 6");
+        }
         if (!isValidEmail(request.getEmail())) {
             throw new EmailAlreadyExistsException("Invalid email format");
         }
-
+        if(request.getPassword().isEmpty()||request.getEmail().isEmpty()||request.getPhoneNumber().isEmpty()||request.getUsername().isEmpty()){
+            throw new RuntimeException("Values that cannot be null");
+        }
         User user = new User();
         user.setUsername(request.getUsername());
         user.setEmail(request.getEmail());
