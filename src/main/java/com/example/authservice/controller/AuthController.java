@@ -2,11 +2,11 @@ package com.example.authservice.controller;
 
 
 import com.example.authservice.exception.EmailAlreadyExistsException;
-import com.example.authservice.exception.UsernameAlreadyExistException;
 import com.example.authservice.jwt.JwtService;
+import com.example.authservice.model.dto.BaseResponse;
 import com.example.authservice.model.enities.CustomUserDetail;
+import com.example.authservice.model.enities.User;
 import com.example.authservice.model.payload.ChangePasswordRequest;
-import com.example.authservice.model.payload.JwtResponse;
 import com.example.authservice.model.payload.LoginRequest;
 import com.example.authservice.model.payload.RegisterRequest;
 import com.example.authservice.service.AuthService;
@@ -33,7 +33,7 @@ import org.springframework.web.bind.annotation.*;
 @RestController
 @RequestMapping("/api/v1/auth")
 @RequiredArgsConstructor
-
+@CrossOrigin
 @Tag(name = "Authentication", description = "APIs for user authentication and registration")
 public class AuthController {
 
@@ -54,18 +54,8 @@ public class AuthController {
                     content = @Content(examples = @ExampleObject(value = "{ \"error\": \"Internal Server Error\" }")))
     })
     public ResponseEntity<?> login(@RequestBody LoginRequest jwtRequest) {
-        try{
+
             return ResponseEntity.ok(authService.login(jwtRequest));
-        }
-        catch (EmailAlreadyExistsException ex) {
-            return new ResponseEntity<>(ex.getMessage(), HttpStatus.NOT_ACCEPTABLE);
-        }
-        catch (RuntimeException runtimeException){
-            return new ResponseEntity<>(runtimeException.getMessage(),HttpStatus.BAD_REQUEST);
-        }
-        catch (Exception ex) {
-            return new ResponseEntity<>("An unexpected error occurred", HttpStatus.INTERNAL_SERVER_ERROR);
-        }
     }
 
     @PostMapping("/register")
@@ -80,27 +70,19 @@ public class AuthController {
     public ResponseEntity<?> register(@RequestBody RegisterRequest request){
         try {
             authService.register(request);
-        } catch (UsernameAlreadyExistException | EmailAlreadyExistsException ex) {
-            return new ResponseEntity<>(ex.getMessage(), HttpStatus.NOT_ACCEPTABLE);
-        } catch (RuntimeException runtimeException){
-            return new ResponseEntity<>(runtimeException.getMessage(),HttpStatus.BAD_REQUEST);
         }
-        catch (Exception ex) {
+        catch (MessagingException ex) {
             return new ResponseEntity<>("An unexpected error occurred", HttpStatus.INTERNAL_SERVER_ERROR);
         }
-        return ResponseEntity.status(HttpStatus.CREATED).body("User registered successfully");
+        return ResponseEntity.status(HttpStatus.CREATED).body(BaseResponse.builder().message("User registered successfully").build());
     }
 
 
     @PostMapping("/verify-register")
-    public ResponseEntity<String> verifyAccountRegister(@RequestParam("code") String code) {
-        try {
-            authService.verifyAccountRegister(code);
-        }catch (UsernameNotFoundException ex){
-            return new ResponseEntity<>(ex.getMessage(),HttpStatus.BAD_REQUEST);
-        }
+    public ResponseEntity<BaseResponse<?>> verifyAccountRegister(@RequestParam("code") String code) {
+        authService.verifyAccountRegister(code);
+        return ResponseEntity.ok(BaseResponse.builder().message("Account verified successfully").build());
 
-        return ResponseEntity.ok("Account verified successfully");
     }
 
     @PostMapping("/forgot-password")
@@ -155,21 +137,21 @@ public class AuthController {
         return ResponseEntity.ok("Password changed successfully");
     }
 
-    @PostMapping("/check_auth")
-    public ResponseEntity<Boolean> checkAuth(HttpServletRequest httpServletRequest){
+    @GetMapping("/check_auth")
+    public ResponseEntity<User> checkAuth(HttpServletRequest httpServletRequest){
         String authHeader = httpServletRequest.getHeader("Authorization");
         if (authHeader != null && authHeader.startsWith("Bearer ")) {
             String token = authHeader.substring(7);
             String email = jwtService.getEmailFromToken(token);
-            if (email != null && SecurityContextHolder.getContext().getAuthentication() == null) {
+            if (email != null) {
                 UserDetails user = userService.loadUserByEmail(email);
                 if (jwtService.validateToken(token, (CustomUserDetail) user)) {
-                    return ResponseEntity.ok(true);
+                    return ResponseEntity.ok(((CustomUserDetail) user).getUser());
                 }else{
-                    return ResponseEntity.ok(false);
+                    return ResponseEntity.ok(null);
                 }
             }
         }
-        return  ResponseEntity.ok(false);
+        return  ResponseEntity.ok(null);
     }
 }
